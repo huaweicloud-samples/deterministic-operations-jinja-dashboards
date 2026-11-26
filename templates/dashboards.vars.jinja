@@ -1,0 +1,16 @@
+{
+    "region": "{{ template_vars['region'] }}",
+    "tag_key": "{{ template_vars['tag_key'] }}",
+    "tag_value": "{{ template_vars['tag_value'] }}",
+    "sfs": {
+        "widget_width": {{ template_vars['sfs']['widget_width'] }},
+        "sfs_fs": [
+        {% for resource in template_vars['sfs']['sfs_fs'] %}
+            {
+                "name": "{{ resource['name'] }}",
+                "file_system_id": "{{ resource['file_system_id'] }}"
+            }{% if not loop.last %},{% endif %}
+        {% endfor %}
+        ]
+    }
+}
