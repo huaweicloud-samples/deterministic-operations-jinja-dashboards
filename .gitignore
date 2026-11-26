@@ -1,0 +1,15 @@
+# Python / 渲染脚本
+.venv/
+__pycache__/
+*.pyc
+
+# Terraform 本地产物
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!terraform.tfvars.example
+
+# 渲染输出（由 scripts/ 重新生成）
+dashboards.vars.json
+infra/dashboards.tf

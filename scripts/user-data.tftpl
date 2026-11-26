@@ -1,0 +1,47 @@
+#!/bin/bash
+# Test controller user data: install NFS/fio and mount SFS Turbo file systems.
+# Rendered by Terraform templatefile with: sfs_mount_points = { fs_id => mount_point }
+# Note: shell variables use $${...} to escape Terraform template interpolation.
+# SFS Turbo 挂载使用 NFSv3（与 SFS 标准文件系统的 NFSv4 不同），并禁用锁（nolock）。
+
+set -eu
+
+exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
+set -x
+
+# Update package index and install dependencies
+apt-get update -y
+apt-get install -y nfs-common fio
+
+# Create mount directories and mount each SFS Turbo file system over NFSv3
+%{for fs_id, mount_point in sfs_mount_points ~}
+mkdir -p /mnt/${fs_id}
+MOUNT_POINT="${mount_point}"
+success=false
+attempt_num=1
+max_attempts=24
+sleep=5
+while [[ $${success} = false ]] && [[ $${attempt_num} -le $${max_attempts} ]]; do
+  mount -t nfs -o vers=3,timeo=600,noresvport,nolock,tcp "$${MOUNT_POINT}" /mnt/${fs_id}
+  if [[ $$? -eq 0 ]]; then
+    success=true
+    echo "File system ${fs_id} has been successfully mounted at /mnt/${fs_id}"
+  else
+    echo "Attempt $${attempt_num} to mount ${fs_id} failed. Trying again..."
+    attempt_num=$(( attempt_num + 1 ))
+    sleep "$${sleep}"
+  fi
+done
+if [[ $${success} = false ]]; then
+  echo "Mounting ${fs_id} failed after $${max_attempts} attempts"
+  exit 1
+fi
+
+# Auto-mount on reboot: export_location looks like <ip>:/, split host and path
+MOUNT_HOST=$(echo "$${MOUNT_POINT}" | cut -d: -f1)
+MOUNT_PATH=$(echo "$${MOUNT_POINT}" | cut -d: -f2)
+echo "$${MOUNT_HOST}:$${MOUNT_PATH} /mnt/${fs_id} nfs vers=3,timeo=600,noresvport,nolock,tcp,_netdev 0 0" >> /etc/fstab
+%{endfor ~}
+
+chmod 755 /mnt
+echo "Test controller user data complete"

@@ -1,0 +1,249 @@
+# ============================================================================
+# 监控面板定义（由 scripts/render_template.py 渲染生成，勿手改）
+# ============================================================================
+# 本文件由 templates/dashboards.tf.jinja 渲染：
+#   python3 scripts/render_vars.py --tag-key Application --tag-value dash-demo \
+#     --template dashboards.vars.jinja --rendered-file dashboards.vars.json
+#   python3 scripts/render_template.py --template dashboards.tf.jinja \
+#     --template-vars dashboards.vars.json --rendered-file infra/dashboards.tf
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# 指标常量（集中定义，便于核对调整）
+#   SFS Turbo 监控命名空间：SYS.EFS（华为云监控服务列表 + SFS Turbo 用户指南）
+#   维度：efs_instance_id（值 = 文件系统实例 ID）
+#   指标周期：1 分钟原始指标。若面板无数据，前往 CES 控制台核对指标后再调。
+# ----------------------------------------------------------------------------
+locals {
+  sfs_metric_namespace    = "SYS.EFS"
+  sfs_metric_dimension    = "efs_instance_id"
+  sfs_metric_read         = "data_read_io_bytes"   # 读带宽 byte/s
+  sfs_metric_write        = "data_write_io_bytes"  # 写带宽 byte/s
+  sfs_metric_total        = "total_io_bytes"       # 总带宽 byte/s
+  sfs_metric_iops         = "iops"                 # IOPS
+  sfs_metric_connections  = "client_connections"   # 客户端连接数
+  sfs_metric_capacity     = "used_capacity"        # 已用容量 byte
+  sfs_metric_capacity_pct = "used_capacity_percent" # 容量使用率 %
+}
+
+# ----------------------------------------------------------------------------
+# 资源层面板（tier 3）：每个文件系统一组指标
+# ----------------------------------------------------------------------------
+{% if template_vars['sfs'] is defined and template_vars['sfs']['sfs_fs']|length %}
+resource "huaweicloud_ces_dashboard" "sfs_resource_tier_3" {
+  name           = "${local.project.name}-${local.project.env}-sfs-resource-tier-3"
+  row_widget_num = 0
+}
+
+{% for resource in template_vars['sfs']['sfs_fs'] %}
+resource "huaweicloud_ces_dashboard_widget" "tier3_data_throughput_{{ loop.index }}" {
+  dashboard_id        = huaweicloud_ces_dashboard.sfs_resource_tier_3.id
+  title               = "SFS resource tier 3 for {{ template_vars['tag_key'] }}: {{ template_vars['tag_value'] }} - {{ resource['name'] }} ({{ resource['file_system_id'] }}) Throughput"
+  view                = "line"
+  metric_display_mode = "multiple"
+
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_read
+    alias       = ["Data read"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_write
+    alias       = ["Data write"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_total
+    alias       = ["Total"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+
+  location {
+    left   = {{ (loop.index0 % 1) * template_vars['sfs']['widget_width'] }}
+    top    = 0
+    width  = {{ template_vars['sfs']['widget_width'] }}
+    height = 6
+  }
+}
+
+resource "huaweicloud_ces_dashboard_widget" "tier3_io_{{ loop.index }}" {
+  dashboard_id        = huaweicloud_ces_dashboard.sfs_resource_tier_3.id
+  title               = "SFS resource tier 3 for {{ template_vars['tag_key'] }}: {{ template_vars['tag_value'] }} - {{ resource['name'] }} ({{ resource['file_system_id'] }}) IO and connections"
+  view                = "line"
+  metric_display_mode = "multiple"
+
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_iops
+    alias       = ["IOPS"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_connections
+    alias       = ["Client connections"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+
+  location {
+    left   = {{ (loop.index0 % 1) * template_vars['sfs']['widget_width'] }}
+    top    = 6
+    width  = {{ template_vars['sfs']['widget_width'] }}
+    height = 6
+  }
+}
+
+resource "huaweicloud_ces_dashboard_widget" "tier3_capacity_{{ loop.index }}" {
+  dashboard_id        = huaweicloud_ces_dashboard.sfs_resource_tier_3.id
+  title               = "SFS resource tier 3 for {{ template_vars['tag_key'] }}: {{ template_vars['tag_value'] }} - {{ resource['name'] }} ({{ resource['file_system_id'] }}) Capacity"
+  view                = "line"
+  metric_display_mode = "multiple"
+
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_capacity
+    alias       = ["Used capacity"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_capacity_pct
+    alias       = ["Used capacity percent"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+
+  location {
+    left   = {{ (loop.index0 % 1) * template_vars['sfs']['widget_width'] }}
+    top    = 12
+    width  = {{ template_vars['sfs']['widget_width'] }}
+    height = 6
+  }
+}
+{% endfor %}
+{% endif %}
+
+# ----------------------------------------------------------------------------
+# 服务层面板（tier 2）：全部文件系统聚合
+# ----------------------------------------------------------------------------
+resource "huaweicloud_ces_dashboard" "sfs_service_tier_2" {
+  name           = "${local.project.name}-${local.project.env}-sfs-service-tier-2"
+  row_widget_num = 0
+}
+
+resource "huaweicloud_ces_dashboard_widget" "tier2_throughput" {
+  dashboard_id        = huaweicloud_ces_dashboard.sfs_service_tier_2.id
+  title               = "SFS service tier 2 for {{ template_vars['tag_key'] }}: {{ template_vars['tag_value'] }} - Throughput"
+  view                = "line"
+  metric_display_mode = "multiple"
+{% if template_vars['sfs'] is defined and template_vars['sfs']['sfs_fs']|length %}
+{% for resource in template_vars['sfs']['sfs_fs'] %}
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_read
+    alias       = ["{{ resource['name'] }} read"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_write
+    alias       = ["{{ resource['name'] }} write"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+{% endfor %}
+{% endif %}
+  location {
+    left   = 0
+    top    = 0
+    width  = 8
+    height = 6
+  }
+}
+
+# ----------------------------------------------------------------------------
+# 系统层面板（tier 1）：容量总览
+# ----------------------------------------------------------------------------
+resource "huaweicloud_ces_dashboard" "sfs_system_tier_1" {
+  name           = "${local.project.name}-${local.project.env}-sfs-system-tier-1"
+  row_widget_num = 0
+}
+
+resource "huaweicloud_ces_dashboard_widget" "tier1_capacity" {
+  dashboard_id        = huaweicloud_ces_dashboard.sfs_system_tier_1.id
+  title               = "SFS system tier 1 for {{ template_vars['tag_key'] }}: {{ template_vars['tag_value'] }} - Capacity overview"
+  view                = "line"
+  metric_display_mode = "multiple"
+{% if template_vars['sfs'] is defined and template_vars['sfs']['sfs_fs']|length %}
+{% for resource in template_vars['sfs']['sfs_fs'] %}
+  metrics {
+    namespace   = local.sfs_metric_namespace
+    metric_name = local.sfs_metric_capacity
+    alias       = ["{{ resource['name'] }} used"]
+
+    dimensions {
+      name        = local.sfs_metric_dimension
+      filter_type = "specific_instances"
+      values      = ["{{ resource['file_system_id'] }}"]
+    }
+  }
+{% endfor %}
+{% endif %}
+  location {
+    left   = 0
+    top    = 0
+    width  = 12
+    height = 6
+  }
+}

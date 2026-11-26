@@ -1,0 +1,17 @@
+# 变量示例文件：复制为 terraform.tfvars 后按需修改（不要提交真实凭据）
+# 本文件不包含任何真实凭据，仅作为变量使用示例。
+
+region = "cn-north-4"
+
+# 单个 SFS Turbo 容量（GB）
+sfs_turbo_size = 500
+
+# 允许 SSH 登录测试控制器的来源网段（生产请收紧为你的出口 IP）
+ssh_allowed_cidr = "0.0.0.0/0"
+
+# 测试控制器规格
+test_controller = {
+  cpu       = 2
+  memory    = 4
+  flavor_id = "s6.large.2"
+}
